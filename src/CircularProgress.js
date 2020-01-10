@@ -16,11 +16,37 @@ export default class CircularProgress extends React.PureComponent {
     var start = this.polarToCartesian(x, y, radius, endAngle * 0.9999);
     var end = this.polarToCartesian(x, y, radius, startAngle);
     var largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
-    var d = ['M', start.x, start.y, 'A', radius, radius, 0, largeArcFlag, 0, end.x, end.y];
+    var d = [
+      'M',
+      start.x,
+      start.y,
+      'A',
+      radius,
+      radius,
+      0,
+      largeArcFlag,
+      0,
+      end.x,
+      end.y,
+    ];
     return d.join(' ');
   }
 
   clampFill = fill => Math.min(100, Math.max(0, fill));
+
+  anglesForPartialCircle = (sideSpace, arcSweepAngle) => {
+    let centerFill = 50;
+    let start = centerFill - sideSpace;
+    let end = centerFill + sideSpace;
+
+    function setFillAngle(p) {
+      return (arcSweepAngle * p) / 100;
+    }
+    return {
+      start: setFillAngle(start),
+      end: setFillAngle(end),
+    };
+  };
 
   render() {
     const {
@@ -39,9 +65,13 @@ export default class CircularProgress extends React.PureComponent {
       padding,
       renderCap,
       dashedBackground,
+      sideSpace,
+      showPartial,
     } = this.props;
 
-    const maxWidthCircle = backgroundWidth ? Math.max(width, backgroundWidth) : width;
+    const maxWidthCircle = backgroundWidth
+      ? Math.max(width, backgroundWidth)
+      : width;
     const sizeWithPadding = size / 2 + padding / 2;
     const radius = size / 2 - maxWidthCircle / 2 - padding / 2;
 
@@ -50,23 +80,35 @@ export default class CircularProgress extends React.PureComponent {
       sizeWithPadding,
       radius,
       0,
-      arcSweepAngle
+      arcSweepAngle,
     );
     const currentFillAngle = (arcSweepAngle * this.clampFill(fill)) / 100;
+
     const circlePath = this.circlePath(
       sizeWithPadding,
       sizeWithPadding,
       radius,
       0,
-      currentFillAngle
+      currentFillAngle,
     );
+
+    const partialCirclePath = this.circlePath(
+      sizeWithPadding,
+      sizeWithPadding,
+      radius,
+      this.anglesForPartialCircle(sideSpace, arcSweepAngle).start,
+      this.anglesForPartialCircle(sideSpace, arcSweepAngle).end,
+    );
+
     const coordinate = this.polarToCartesian(
       sizeWithPadding,
       sizeWithPadding,
       radius,
-      currentFillAngle
+      currentFillAngle,
     );
-    const cap = this.props.renderCap ? this.props.renderCap({ center: coordinate }) : null;
+    const cap = this.props.renderCap
+      ? this.props.renderCap({ center: coordinate })
+      : null;
 
     const offset = size - maxWidthCircle * 2;
 
@@ -83,21 +125,21 @@ export default class CircularProgress extends React.PureComponent {
         overflow: 'hidden',
       },
       ...childrenContainerStyle,
-    }
+    };
 
-    const dashedBackgroundStyle = dashedBackground.gap > 0
-      ? dashedBackground
-      : { width:0, gap:0 };
+    const dashedBackgroundStyle =
+      dashedBackground.gap > 0
+        ? `${dashedBackground.width}, ${dashedBackground.gap}`
+        : dashedBackground;
 
-    const strokeDasharray = dashedBackground.gap > 0 ? 
-    Object.values(dashedBackgroundStyle)
-      .map(value => parseInt(value)) 
-      : null;
+    const strokeDasharray = Object.values(dashedBackgroundStyle).map(value =>
+      parseInt(value),
+    );
 
     return (
       <View style={style}>
         <Svg width={size + padding} height={size + padding}>
-          <G rotation={rotation} originX={(size + padding) / 2} originY={(size + padding) / 2}>
+          <G rotation={rotation} originX={size / 2} originY={size / 2}>
             {backgroundColor && (
               <Path
                 d={backgroundPath}
@@ -108,9 +150,18 @@ export default class CircularProgress extends React.PureComponent {
                 fill="transparent"
               />
             )}
-            {fill > 0 && (
+            {fill > 0 && !showPartial && (
               <Path
                 d={circlePath}
+                stroke={tintColor}
+                strokeWidth={width}
+                strokeLinecap={lineCap}
+                fill="transparent"
+              />
+            )}
+            {showPartial && (
+              <Path
+                d={partialCirclePath}
                 stroke={tintColor}
                 strokeWidth={width}
                 strokeLinecap={lineCap}
@@ -120,7 +171,9 @@ export default class CircularProgress extends React.PureComponent {
             {cap}
           </G>
         </Svg>
-        {children && <View style={localChildrenContainerStyle}>{children(fill)}</View>}
+        {children && (
+          <View style={localChildrenContainerStyle}>{children(fill)}</View>
+        )}
       </View>
     );
   }
@@ -142,6 +195,8 @@ CircularProgress.propTypes = {
   padding: PropTypes.number,
   renderCap: PropTypes.func,
   dashedBackground: PropTypes.object,
+  sideSpace: PropTypes.number,
+  showPartial: PropTypes.bool,
 };
 
 CircularProgress.defaultProps = {
@@ -151,4 +206,6 @@ CircularProgress.defaultProps = {
   arcSweepAngle: 360,
   padding: 0,
   dashedBackground: { width: 0, gap: 0 },
+  sideSpace: 10,
+  showPartial: false,
 };
